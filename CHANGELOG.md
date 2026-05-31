@@ -2,7 +2,7 @@
 
 All notable changes to this project are documented in this file.
 
-## 0.1.0 - 2026-05-07
+## 1.0.0 - 2026-05-31
 
 - Initial Python SDK implementation.
 - Added ConfigBuilder, flag evaluation, context targeting, and deterministic percentage rollouts.

@@ -238,7 +238,7 @@ mypy src
 Validate tag/version/changelog consistency locally:
 
 ```bash
-python scripts/validate_release.py --tag v0.1.0
+python scripts/validate_release.py --tag v1.0.0
 ```
 
 ## License
