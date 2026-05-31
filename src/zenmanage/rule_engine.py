@@ -50,7 +50,8 @@ class RuleEngine:
 
         attribute = context.get_attribute(attribute_name)
         if attribute is None:
-            if operator in {"notequal", "notin", "notcontains", "notstartswith", "notendswith", "isnull"}:
+            negated_ops = {"notequal", "notin", "notcontains", "notstartswith", "notendswith", "isnull"}
+            if operator in negated_ops:
                 return True
             return False
 

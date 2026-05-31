@@ -172,4 +172,5 @@ def test_negative_operators_with_absent_attribute_match() -> None:
     engine = RuleEngine()
     context = Context.single("user", "u-1")
     for op in ("notequal", "notin", "notcontains", "notstartswith", "notendswith"):
-        assert engine.evaluate([_rule("missing", op, "x")], context) is not None, f"{op} should match absent attr"
+        result = engine.evaluate([_rule("missing", op, "x")], context)
+        assert result is not None, f"{op} should match absent attr"
