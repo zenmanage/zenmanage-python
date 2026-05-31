@@ -222,25 +222,6 @@ See [examples/README.md](examples/README.md) for runnable examples:
 
 Framework integrations: [docs/FRAMEWORK_INTEGRATIONS.md](docs/FRAMEWORK_INTEGRATIONS.md)
 
-## Development
-
-```bash
-python -m venv .venv
-source .venv/bin/activate
-pip install -e .[dev]
-pytest
-ruff check .
-mypy src
-```
-
-## Publishing
-
-Validate tag/version/changelog consistency locally:
-
-```bash
-python scripts/validate_release.py --tag v1.0.0
-```
-
 ## License
 
 MIT
