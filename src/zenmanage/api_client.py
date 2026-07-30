@@ -102,7 +102,13 @@ class ApiClient:
             headers["X-ZENMANAGE-CONTEXT"] = json.dumps(context.to_dict())
 
         if default_value is not None:
-            headers["X-Default-Value"] = json.dumps({key: default_value})
+            try:
+                headers["X-Default-Value"] = json.dumps({key: default_value})
+            except TypeError as error:
+                self._debug(
+                    "Failed to serialize default value",
+                    extra={"key": key, "error": str(error)},
+                )
 
         url = f"{self.base_url}/v1/flags/{quote(key, safe='')}/usage"
 

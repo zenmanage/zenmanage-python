@@ -182,6 +182,18 @@ async def test_report_usage_omits_default_value_header_when_not_provided() -> No
 
 
 @pytest.mark.asyncio
+async def test_report_usage_skips_default_value_header_on_serialization_failure() -> None:
+    client = FakeAsyncClient([])
+    api = AsyncApiClient("srv_test", client=client, logger=DummyLogger())
+
+    # object() is not JSON-serializable; the header should be dropped, not raise.
+    await api.report_usage("new-ui", None, object())  # type: ignore[arg-type]
+
+    assert client.last_post_headers is not None
+    assert "X-Default-Value" not in client.last_post_headers
+
+
+@pytest.mark.asyncio
 async def test_aclose_closes_client() -> None:
     client = FakeAsyncClient([])
     api = AsyncApiClient("srv_test", client=client)

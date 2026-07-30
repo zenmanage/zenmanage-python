@@ -193,6 +193,17 @@ def test_report_usage_omits_default_value_header_when_not_provided() -> None:
     assert "X-Default-Value" not in session.last_post_headers
 
 
+def test_report_usage_skips_default_value_header_on_serialization_failure() -> None:
+    session = FakeSession([])
+    client = ApiClient("srv_test", session=session, logger=DummyLogger())
+
+    # object() is not JSON-serializable; the header should be dropped, not raise.
+    client.report_usage("new-ui", None, object())  # type: ignore[arg-type]
+
+    assert session.last_post_headers is not None
+    assert "X-Default-Value" not in session.last_post_headers
+
+
 def test_report_usage_url_encodes_flag_key() -> None:
     """Flag keys with path-special characters must be percent-encoded in the URL."""
     session = FakeSession([])
