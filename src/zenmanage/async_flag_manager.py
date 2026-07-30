@@ -52,14 +52,14 @@ class AsyncFlagManager:
 
         if default_value is not None:
             result = self._create_flag_from_default(key, default_value)
-            await self.report_usage(key, self._usage_context())
+            await self.report_usage(key, self._usage_context(), default_value)
             return result
 
         if self._defaults.has(key):
             value = self._defaults.get(key)
             if value is not None:
                 result = self._create_flag_from_default(key, value)
-                await self.report_usage(key, self._usage_context())
+                await self.report_usage(key, self._usage_context(), value)
                 return result
 
         raise EvaluationError(f"Flag not found: {key}")
@@ -74,8 +74,13 @@ class AsyncFlagManager:
         clone._defaults = defaults
         return clone
 
-    async def report_usage(self, key: str, context: Optional[Context] = None) -> None:
-        await self._api_client.report_usage(key, context)
+    async def report_usage(
+        self,
+        key: str,
+        context: Optional[Context] = None,
+        default_value: Optional[FlagValue] = None,
+    ) -> None:
+        await self._api_client.report_usage(key, context, default_value)
 
     async def refresh_rules(self) -> None:
         await self._load_rules_from_api()

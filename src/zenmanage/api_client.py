@@ -11,7 +11,7 @@ import requests
 
 from .context import Context
 from .errors import FetchRulesError, InvalidRulesError
-from .types import Logger, RulesResponse
+from .types import FlagValue, Logger, RulesResponse
 
 SDK_VERSION = "1.0.0"
 CLIENT_AGENT = "zenmanage-python"
@@ -87,7 +87,12 @@ class ApiClient:
 
         raise FetchRulesError(f"Failed to fetch rules after {MAX_RETRIES} attempts: {last_error}")
 
-    def report_usage(self, key: str, context: Optional[Context] = None) -> None:
+    def report_usage(
+        self,
+        key: str,
+        context: Optional[Context] = None,
+        default_value: Optional[FlagValue] = None,
+    ) -> None:
         if not self.enable_usage_reporting:
             self._debug("Usage reporting disabled")
             return
@@ -95,6 +100,9 @@ class ApiClient:
         headers = dict(self.headers)
         if context is not None and self._should_send_context(context):
             headers["X-ZENMANAGE-CONTEXT"] = json.dumps(context.to_dict())
+
+        if default_value is not None:
+            headers["X-Default-Value"] = json.dumps({key: default_value})
 
         url = f"{self.base_url}/v1/flags/{quote(key, safe='')}/usage"
 
