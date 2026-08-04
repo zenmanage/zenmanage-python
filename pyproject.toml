@@ -70,6 +70,11 @@ target-version = "py39"
 [tool.ruff.lint]
 select = ["E", "F", "I", "B", "N"]
 
+# Bare `assert` is the standard pytest idiom (pytest rewrites asserts for rich
+# failure output) and the suite is never run with -O, so B101 does not apply.
+[tool.bandit]
+exclude_dirs = ["tests"]
+
 [tool.mypy]
 python_version = "3.9"
 warn_return_any = true
