@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Optional
 
@@ -148,6 +149,48 @@ async def test_report_usage_network_error_is_ignored() -> None:
     client = FakeAsyncClient([], post_error=httpx.HTTPError("boom"))
     api = AsyncApiClient("srv_test", client=client)
     await api.report_usage("new-ui", Context.single("user", "u-1"))
+
+
+@pytest.mark.asyncio
+async def test_report_usage_sends_default_value_header() -> None:
+    client = FakeAsyncClient([])
+    api = AsyncApiClient("srv_test", client=client)
+    await api.report_usage("new-ui", None, True)
+
+    assert client.last_post_headers is not None
+    assert json.loads(client.last_post_headers["X-Default-Value"]) == {"new-ui": True}
+
+
+@pytest.mark.asyncio
+async def test_report_usage_sends_non_bool_default_value_header() -> None:
+    client = FakeAsyncClient([])
+    api = AsyncApiClient("srv_test", client=client)
+    await api.report_usage("num-flag", None, 42)
+
+    assert client.last_post_headers is not None
+    assert json.loads(client.last_post_headers["X-Default-Value"]) == {"num-flag": 42}
+
+
+@pytest.mark.asyncio
+async def test_report_usage_omits_default_value_header_when_not_provided() -> None:
+    client = FakeAsyncClient([])
+    api = AsyncApiClient("srv_test", client=client)
+    await api.report_usage("new-ui")
+
+    assert client.last_post_headers is not None
+    assert "X-Default-Value" not in client.last_post_headers
+
+
+@pytest.mark.asyncio
+async def test_report_usage_skips_default_value_header_on_serialization_failure() -> None:
+    client = FakeAsyncClient([])
+    api = AsyncApiClient("srv_test", client=client, logger=DummyLogger())
+
+    # object() is not JSON-serializable; the header should be dropped, not raise.
+    await api.report_usage("new-ui", None, object())  # type: ignore[arg-type]
+
+    assert client.last_post_headers is not None
+    assert "X-Default-Value" not in client.last_post_headers
 
 
 @pytest.mark.asyncio

@@ -14,13 +14,15 @@ from zenmanage.rule_engine import RuleEngine
 class StubAsyncApiClient:
     def __init__(self, flags: list[dict]) -> None:
         self.flags = flags
-        self.reported: list[tuple[str, object]] = []
+        self.reported: list[tuple[str, object, object]] = []
 
     async def get_rules(self) -> dict:
         return {"version": "2026-01-01", "flags": self.flags}
 
-    async def report_usage(self, key: str, context: object = None) -> None:
-        self.reported.append((key, context))
+    async def report_usage(
+        self, key: str, context: object = None, default_value: object = None
+    ) -> None:
+        self.reported.append((key, context, default_value))
 
 
 class StubCache:
@@ -65,6 +67,7 @@ async def test_async_single_returns_existing_flag() -> None:
     flag = await manager.single("new-ui")
     assert flag.as_bool() is False
     assert api.reported[0][0] == "new-ui"
+    assert api.reported[0][2] is None
 
 
 @pytest.mark.asyncio
@@ -109,12 +112,15 @@ async def test_async_all_returns_all_flags() -> None:
 
 @pytest.mark.asyncio
 async def test_async_single_uses_inline_default_and_defaults_collection() -> None:
-    manager = AsyncFlagManager(StubAsyncApiClient([]), StubCache(), RuleEngine(), 300)
+    api = StubAsyncApiClient([])
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
     assert (await manager.single("missing", True)).as_bool() is True
+    assert api.reported[-1] == ("missing", None, True)
 
     defaults = DefaultsCollection.from_dict({"welcome": "hello"})
     with_defaults = manager.with_defaults(defaults)
     assert (await with_defaults.single("welcome")).as_string() == "hello"
+    assert api.reported[-1] == ("welcome", None, "hello")
 
 
 @pytest.mark.asyncio

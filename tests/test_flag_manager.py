@@ -14,13 +14,13 @@ from zenmanage.rule_engine import RuleEngine
 class StubApiClient:
     def __init__(self, flags: list[dict]) -> None:
         self.flags = flags
-        self.reported: list[tuple[str, object]] = []
+        self.reported: list[tuple[str, object, object]] = []
 
     def get_rules(self) -> dict:
         return {"version": "2026-01-01", "flags": self.flags}
 
-    def report_usage(self, key: str, context: object = None) -> None:
-        self.reported.append((key, context))
+    def report_usage(self, key: str, context: object = None, default_value: object = None) -> None:
+        self.reported.append((key, context, default_value))
 
 
 class StubCache:
@@ -66,6 +66,7 @@ def test_single_returns_existing_flag() -> None:
 
     assert flag.as_bool() is False
     assert api.reported[0][0] == "new-ui"
+    assert api.reported[0][2] is None
 
 
 def test_single_uses_inline_default() -> None:
@@ -74,6 +75,7 @@ def test_single_uses_inline_default() -> None:
 
     flag = manager.single("missing", True)
     assert flag.as_bool() is True
+    assert api.reported[-1] == ("missing", None, True)
 
 
 def test_single_uses_defaults_collection() -> None:
@@ -83,6 +85,7 @@ def test_single_uses_defaults_collection() -> None:
 
     flag = manager.single("welcome")
     assert flag.as_string() == "hello"
+    assert api.reported[-1] == ("welcome", None, "hello")
 
 
 def test_single_missing_raises() -> None:

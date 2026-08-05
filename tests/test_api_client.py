@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from dataclasses import dataclass
 from typing import Optional
 
@@ -160,6 +161,47 @@ def test_get_rules_rejects_http_cdn_url() -> None:
 
     with pytest.raises(FetchRulesError, match="HTTPS"):
         client.get_rules()
+
+
+def test_report_usage_sends_default_value_header() -> None:
+    session = FakeSession([])
+    client = ApiClient("srv_test", session=session)
+
+    client.report_usage("new-ui", None, True)
+
+    assert session.last_post_headers is not None
+    assert json.loads(session.last_post_headers["X-Default-Value"]) == {"new-ui": True}
+
+
+def test_report_usage_sends_non_bool_default_value_header() -> None:
+    session = FakeSession([])
+    client = ApiClient("srv_test", session=session)
+
+    client.report_usage("num-flag", None, 42)
+
+    assert session.last_post_headers is not None
+    assert json.loads(session.last_post_headers["X-Default-Value"]) == {"num-flag": 42}
+
+
+def test_report_usage_omits_default_value_header_when_not_provided() -> None:
+    session = FakeSession([])
+    client = ApiClient("srv_test", session=session)
+
+    client.report_usage("new-ui")
+
+    assert session.last_post_headers is not None
+    assert "X-Default-Value" not in session.last_post_headers
+
+
+def test_report_usage_skips_default_value_header_on_serialization_failure() -> None:
+    session = FakeSession([])
+    client = ApiClient("srv_test", session=session, logger=DummyLogger())
+
+    # object() is not JSON-serializable; the header should be dropped, not raise.
+    client.report_usage("new-ui", None, object())  # type: ignore[arg-type]
+
+    assert session.last_post_headers is not None
+    assert "X-Default-Value" not in session.last_post_headers
 
 
 def test_report_usage_url_encodes_flag_key() -> None:
