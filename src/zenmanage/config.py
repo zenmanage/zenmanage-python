@@ -29,7 +29,8 @@ class Config:
 
 class ConfigBuilder:
     def __init__(self) -> None:
-        self._config = Config(environment_token="")
+        # Empty placeholder, not a credential — build() rejects empty tokens.
+        self._config = Config(environment_token="")  # nosec B106
 
     @classmethod
     def create(cls) -> "ConfigBuilder":
