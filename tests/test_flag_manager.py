@@ -69,6 +69,25 @@ def test_single_returns_existing_flag() -> None:
     assert api.reported[0][2] is None
 
 
+def test_single_reports_inline_default_when_flag_found() -> None:
+    api = StubApiClient([_base_flag()])
+    manager = FlagManager(api, StubCache(), RuleEngine(), 300)
+
+    flag = manager.single("new-ui", False)
+    assert flag.as_bool() is False
+    assert api.reported[-1] == ("new-ui", None, False)
+
+
+def test_single_reports_defaults_collection_value_when_flag_found() -> None:
+    api = StubApiClient([_base_flag()])
+    defaults = DefaultsCollection.from_dict({"new-ui": True})
+    manager = FlagManager(api, StubCache(), RuleEngine(), 300).with_defaults(defaults)
+
+    flag = manager.single("new-ui")
+    assert flag.as_bool() is False
+    assert api.reported[-1] == ("new-ui", None, True)
+
+
 def test_single_uses_inline_default() -> None:
     api = StubApiClient([])
     manager = FlagManager(api, StubCache(), RuleEngine(), 300)

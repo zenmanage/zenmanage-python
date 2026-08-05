@@ -71,6 +71,27 @@ async def test_async_single_returns_existing_flag() -> None:
 
 
 @pytest.mark.asyncio
+async def test_async_single_reports_inline_default_when_flag_found() -> None:
+    api = StubAsyncApiClient([_base_flag()])
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
+
+    flag = await manager.single("new-ui", False)
+    assert flag.as_bool() is False
+    assert api.reported[-1] == ("new-ui", None, False)
+
+
+@pytest.mark.asyncio
+async def test_async_single_reports_defaults_collection_value_when_flag_found() -> None:
+    api = StubAsyncApiClient([_base_flag()])
+    defaults = DefaultsCollection.from_dict({"new-ui": True})
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300).with_defaults(defaults)
+
+    flag = await manager.single("new-ui")
+    assert flag.as_bool() is False
+    assert api.reported[-1] == ("new-ui", None, True)
+
+
+@pytest.mark.asyncio
 async def test_async_single_missing_raises() -> None:
     manager = AsyncFlagManager(StubAsyncApiClient([]), StubCache(), RuleEngine(), 300)
     with pytest.raises(EvaluationError):

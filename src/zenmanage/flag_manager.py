@@ -44,23 +44,17 @@ class FlagManager:
 
     def single(self, key: str, default_value: Optional[FlagValue] = None) -> Flag:
         self._ensure_rules_loaded()
+        effective_default = self._resolve_effective_default(key, default_value)
 
         for flag in self._flags or []:
             if flag.key == key:
-                self.report_usage(key, self._usage_context())
+                self.report_usage(key, self._usage_context(), effective_default)
                 return self._evaluate_flag(flag)
 
-        if default_value is not None:
-            result = self._create_flag_from_default(key, default_value)
-            self.report_usage(key, self._usage_context(), default_value)
+        if effective_default is not None:
+            result = self._create_flag_from_default(key, effective_default)
+            self.report_usage(key, self._usage_context(), effective_default)
             return result
-
-        if self._defaults.has(key):
-            value = self._defaults.get(key)
-            if value is not None:
-                result = self._create_flag_from_default(key, value)
-                self.report_usage(key, self._usage_context(), value)
-                return result
 
         raise EvaluationError(f"Flag not found: {key}")
 
@@ -84,6 +78,13 @@ class FlagManager:
 
     def refresh_rules(self) -> None:
         self._load_rules_from_api()
+
+    def _resolve_effective_default(
+        self, key: str, default_value: Optional[FlagValue]
+    ) -> Optional[FlagValue]:
+        if default_value is not None:
+            return default_value
+        return self._defaults.get(key) if self._defaults.has(key) else None
 
     def _usage_context(self) -> Optional[Context]:
         if (
