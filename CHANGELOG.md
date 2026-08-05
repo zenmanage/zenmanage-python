@@ -2,6 +2,10 @@
 
 All notable changes to this project are documented in this file.
 
+## 1.1.1 - 2026-08-05
+
+- Fixed `single()` (sync and async) to report the effective default value (inline parameter, falling back to a `DefaultsCollection` entry) on every usage report, including when the flag is found and evaluated normally — previously the default was only sent on the fallback paths.
+
 ## 1.1.0 - 2026-08-05
 
 - `report_usage()` now threads the default value used on a flag-evaluation fallback through to the API, sent as an `X-Default-Value` header, so it can be persisted and shown on the flag detail page.

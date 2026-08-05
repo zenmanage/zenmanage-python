@@ -47,7 +47,9 @@ class AsyncFlagManager:
 
         for flag in self._flags or []:
             if flag.key == key:
-                await self.report_usage(key, self._usage_context())
+                await self.report_usage(
+                    key, self._usage_context(), self._resolve_effective_default(key, default_value)
+                )
                 return self._evaluate_flag(flag)
 
         if default_value is not None:
@@ -84,6 +86,13 @@ class AsyncFlagManager:
 
     async def refresh_rules(self) -> None:
         await self._load_rules_from_api()
+
+    def _resolve_effective_default(
+        self, key: str, default_value: Optional[FlagValue]
+    ) -> Optional[FlagValue]:
+        if default_value is not None:
+            return default_value
+        return self._defaults.get(key) if self._defaults.has(key) else None
 
     def _usage_context(self) -> Optional[Context]:
         if (
