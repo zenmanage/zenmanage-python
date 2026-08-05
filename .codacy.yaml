@@ -1,0 +1,8 @@
+---
+# Bare `assert` is the standard pytest idiom (pytest rewrites asserts for rich
+# failure output) and the suite is never run with -O, so Bandit's B101 does not
+# apply to tests. Mirrors [tool.bandit] in pyproject.toml for local runs.
+engines:
+  bandit:
+    exclude_paths:
+      - tests/**
