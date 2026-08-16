@@ -126,6 +126,16 @@ async def test_get_rules_invalid_rules_payload_raises() -> None:
 
 
 @pytest.mark.asyncio
+async def test_report_usage_sends_api_key_header() -> None:
+    client = FakeAsyncClient([])
+    api = AsyncApiClient("srv_test", client=client)
+    await api.report_usage("new-ui")
+
+    assert client.last_post_headers is not None
+    assert client.last_post_headers["X-ZEN-API-KEY"] == "srv_test"
+
+
+@pytest.mark.asyncio
 async def test_report_usage_with_context_header() -> None:
     client = FakeAsyncClient([])
     api = AsyncApiClient("srv_test", client=client)

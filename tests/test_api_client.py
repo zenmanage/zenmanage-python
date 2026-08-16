@@ -125,6 +125,16 @@ def test_get_rules_invalid_metadata_json() -> None:
         client.get_rules()
 
 
+def test_report_usage_sends_api_key_header() -> None:
+    session = FakeSession([], post_error=None)
+    client = ApiClient("srv_test", session=session)
+
+    client.report_usage("new-ui")
+
+    assert session.last_post_headers is not None
+    assert session.last_post_headers["X-ZEN-API-KEY"] == "srv_test"
+
+
 def test_report_usage_with_context_header() -> None:
     session = FakeSession([], post_error=None)
     client = ApiClient("srv_test", session=session)
