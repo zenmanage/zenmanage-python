@@ -124,7 +124,7 @@ async def test_report_usage_with_context_header() -> None:
     await api.report_usage("new-ui", Context.single("user", "u-1"))
 
     assert client.last_post_headers is not None
-    assert "X-ZENMANAGE-CONTEXT" in client.last_post_headers
+    assert "X-ZEN-CONTEXT" in client.last_post_headers
 
 
 @pytest.mark.asyncio
@@ -141,7 +141,7 @@ async def test_report_usage_anonymous_context_omits_header() -> None:
     api = AsyncApiClient("srv_test", client=client)
     await api.report_usage("new-ui", Context("anonymous"))
     assert client.last_post_headers is not None
-    assert "X-ZENMANAGE-CONTEXT" not in client.last_post_headers
+    assert "X-ZEN-CONTEXT" not in client.last_post_headers
 
 
 @pytest.mark.asyncio
@@ -158,7 +158,7 @@ async def test_report_usage_sends_default_value_header() -> None:
     await api.report_usage("new-ui", None, True)
 
     assert client.last_post_headers is not None
-    assert json.loads(client.last_post_headers["X-Default-Value"]) == {"new-ui": True}
+    assert json.loads(client.last_post_headers["X-ZEN-DEFAULT-VALUE"]) == {"new-ui": True}
 
 
 @pytest.mark.asyncio
@@ -168,7 +168,7 @@ async def test_report_usage_sends_non_bool_default_value_header() -> None:
     await api.report_usage("num-flag", None, 42)
 
     assert client.last_post_headers is not None
-    assert json.loads(client.last_post_headers["X-Default-Value"]) == {"num-flag": 42}
+    assert json.loads(client.last_post_headers["X-ZEN-DEFAULT-VALUE"]) == {"num-flag": 42}
 
 
 @pytest.mark.asyncio
@@ -178,7 +178,7 @@ async def test_report_usage_omits_default_value_header_when_not_provided() -> No
     await api.report_usage("new-ui")
 
     assert client.last_post_headers is not None
-    assert "X-Default-Value" not in client.last_post_headers
+    assert "X-ZEN-DEFAULT-VALUE" not in client.last_post_headers
 
 
 @pytest.mark.asyncio
@@ -190,7 +190,7 @@ async def test_report_usage_skips_default_value_header_on_serialization_failure(
     await api.report_usage("new-ui", None, object())  # type: ignore[arg-type]
 
     assert client.last_post_headers is not None
-    assert "X-Default-Value" not in client.last_post_headers
+    assert "X-ZEN-DEFAULT-VALUE" not in client.last_post_headers
 
 
 @pytest.mark.asyncio

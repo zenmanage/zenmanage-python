@@ -39,7 +39,7 @@ class AsyncApiClient:
         self.headers = {
             "Accept": "application/json",
             "Content-Type": "application/json",
-            "X-API-Key": environment_token,
+            "X-ZEN-API-KEY": environment_token,
             "X-ZEN-CLIENT-AGENT": f"{CLIENT_AGENT}/{SDK_VERSION}",
         }
 
@@ -98,11 +98,11 @@ class AsyncApiClient:
 
         headers = dict(self.headers)
         if context is not None and self._should_send_context(context):
-            headers["X-ZENMANAGE-CONTEXT"] = json.dumps(context.to_dict())
+            headers["X-ZEN-CONTEXT"] = json.dumps(context.to_dict())
 
         if default_value is not None:
             try:
-                headers["X-Default-Value"] = json.dumps({key: default_value})
+                headers["X-ZEN-DEFAULT-VALUE"] = json.dumps({key: default_value})
             except TypeError as error:
                 self._debug(
                     "Failed to serialize default value",

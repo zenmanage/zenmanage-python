@@ -125,7 +125,7 @@ def test_report_usage_with_context_header() -> None:
     client.report_usage("new-ui", context)
 
     assert session.last_post_headers is not None
-    assert "X-ZENMANAGE-CONTEXT" in session.last_post_headers
+    assert "X-ZEN-CONTEXT" in session.last_post_headers
 
 
 def test_report_usage_without_context_header_for_anonymous() -> None:
@@ -135,7 +135,7 @@ def test_report_usage_without_context_header_for_anonymous() -> None:
     client.report_usage("new-ui", Context("anonymous"))
 
     assert session.last_post_headers is not None
-    assert "X-ZENMANAGE-CONTEXT" not in session.last_post_headers
+    assert "X-ZEN-CONTEXT" not in session.last_post_headers
 
 
 def test_report_usage_disabled() -> None:
@@ -170,7 +170,7 @@ def test_report_usage_sends_default_value_header() -> None:
     client.report_usage("new-ui", None, True)
 
     assert session.last_post_headers is not None
-    assert json.loads(session.last_post_headers["X-Default-Value"]) == {"new-ui": True}
+    assert json.loads(session.last_post_headers["X-ZEN-DEFAULT-VALUE"]) == {"new-ui": True}
 
 
 def test_report_usage_sends_non_bool_default_value_header() -> None:
@@ -180,7 +180,7 @@ def test_report_usage_sends_non_bool_default_value_header() -> None:
     client.report_usage("num-flag", None, 42)
 
     assert session.last_post_headers is not None
-    assert json.loads(session.last_post_headers["X-Default-Value"]) == {"num-flag": 42}
+    assert json.loads(session.last_post_headers["X-ZEN-DEFAULT-VALUE"]) == {"num-flag": 42}
 
 
 def test_report_usage_omits_default_value_header_when_not_provided() -> None:
@@ -190,7 +190,7 @@ def test_report_usage_omits_default_value_header_when_not_provided() -> None:
     client.report_usage("new-ui")
 
     assert session.last_post_headers is not None
-    assert "X-Default-Value" not in session.last_post_headers
+    assert "X-ZEN-DEFAULT-VALUE" not in session.last_post_headers
 
 
 def test_report_usage_skips_default_value_header_on_serialization_failure() -> None:
@@ -201,7 +201,7 @@ def test_report_usage_skips_default_value_header_on_serialization_failure() -> N
     client.report_usage("new-ui", None, object())  # type: ignore[arg-type]
 
     assert session.last_post_headers is not None
-    assert "X-Default-Value" not in session.last_post_headers
+    assert "X-ZEN-DEFAULT-VALUE" not in session.last_post_headers
 
 
 def test_report_usage_url_encodes_flag_key() -> None:
