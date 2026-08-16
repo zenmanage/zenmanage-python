@@ -9,11 +9,11 @@ from urllib.parse import quote
 
 import httpx
 
+from ._version import SDK_VERSION
 from .context import Context
 from .errors import FetchRulesError, InvalidRulesError
 from .types import FlagValue, Logger, RulesResponse
 
-SDK_VERSION = "1.0.0"
 CLIENT_AGENT = "zenmanage-python"
 DEFAULT_API_ENDPOINT = "https://api.zenmanage.com"
 RULES_PATH = "/v1/flag-json"

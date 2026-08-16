@@ -7,6 +7,7 @@ from typing import Optional
 import pytest
 import requests
 
+from zenmanage._version import SDK_VERSION
 from zenmanage.api_client import ApiClient
 from zenmanage.context import Context
 from zenmanage.errors import FetchRulesError
@@ -61,6 +62,13 @@ class DummyLogger:
 
     def error(self, msg: object, *args: object, **kwargs: object) -> None:
         return None
+
+
+def test_client_agent_header_uses_installed_package_version() -> None:
+    session = FakeSession([])
+    client = ApiClient("srv_test", session=session)
+
+    assert client.headers["X-ZEN-CLIENT-AGENT"] == f"zenmanage-python/{SDK_VERSION}"
 
 
 def test_get_rules_success() -> None:

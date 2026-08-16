@@ -7,6 +7,7 @@ from typing import Optional
 import httpx
 import pytest
 
+from zenmanage._version import SDK_VERSION
 from zenmanage.async_api_client import AsyncApiClient
 from zenmanage.context import Context
 from zenmanage.errors import FetchRulesError
@@ -65,6 +66,13 @@ class DummyLogger:
 
     def error(self, msg: object, *args: object, **kwargs: object) -> None:
         return None
+
+
+def test_client_agent_header_uses_installed_package_version() -> None:
+    client = FakeAsyncClient([])
+    api = AsyncApiClient("srv_test", client=client)
+
+    assert api.headers["X-ZEN-CLIENT-AGENT"] == f"zenmanage-python/{SDK_VERSION}"
 
 
 @pytest.mark.asyncio
