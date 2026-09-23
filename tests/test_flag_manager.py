@@ -209,3 +209,103 @@ def test_default_value_type_inference() -> None:
     manager = FlagManager(StubApiClient([]), StubCache(), RuleEngine(), 300)
     assert manager.single("n", 3.14).as_number() == 3.14
     assert manager.single("s", "hello").as_string() == "hello"
+
+
+class RecordingLogger:
+    """Minimal logger stub that records warning() calls for assertions."""
+
+    def __init__(self) -> None:
+        self.warnings: list[tuple[object, ...]] = []
+
+    def debug(self, msg: object, *args: object, **kwargs: object) -> None:
+        pass
+
+    def info(self, msg: object, *args: object, **kwargs: object) -> None:
+        pass
+
+    def warning(self, msg: object, *args: object, **kwargs: object) -> None:
+        self.warnings.append((msg, *args))
+
+    def error(self, msg: object, *args: object, **kwargs: object) -> None:
+        pass
+
+
+def _json_flag(**overrides: object) -> dict:
+    """A flag using a type the API may start serving before this SDK knows about it."""
+    payload = {
+        "version": "fla_json",
+        "type": "json",
+        "key": "json-flag",
+        "name": "json-flag",
+        "target": {"value": {"value": {"json": {"nested": "value", "count": 3}}}},
+        "rules": [],
+    }
+    payload.update(overrides)
+    return payload
+
+
+def _mixed_type_payload() -> list[dict]:
+    return [
+        _base_flag(key="bool-flag", type="boolean", target={"value": {"value": {"boolean": True}}}),
+        _base_flag(key="str-flag", type="string", target={"value": {"value": {"string": "hello"}}}),
+        _base_flag(key="num-flag", type="number", target={"value": {"value": {"number": 42}}}),
+        _json_flag(),
+    ]
+
+
+def test_single_unrecognized_flag_type_resolves_to_inline_default() -> None:
+    """A rules payload with a future/unknown flag type (e.g. "json") must not raise, and the
+    unknown flag must resolve to the caller's default rather than a garbage/mis-parsed value —
+    while every other flag in the same payload evaluates normally."""
+    api = StubApiClient(_mixed_type_payload())
+    manager = FlagManager(api, StubCache(), RuleEngine(), 300)
+
+    assert manager.single("bool-flag", False).is_enabled() is True
+    assert manager.single("str-flag", "fallback").as_string() == "hello"
+    assert manager.single("num-flag", 0).as_number() == 42.0
+
+    json_flag = manager.single("json-flag", "my-default")
+    assert json_flag.as_string() == "my-default"
+    assert json_flag.get_value() == "my-default"
+
+    json_flag_bool_default = manager.single("json-flag", True)
+    assert json_flag_bool_default.is_enabled() is True
+
+
+def test_single_unrecognized_flag_type_resolves_to_defaults_collection() -> None:
+    api = StubApiClient(_mixed_type_payload())
+    defaults = DefaultsCollection.from_dict({"json-flag": "collection-default"})
+    manager = FlagManager(api, StubCache(), RuleEngine(), 300).with_defaults(defaults)
+
+    flag = manager.single("json-flag")
+    assert flag.as_string() == "collection-default"
+
+
+def test_single_unrecognized_flag_type_raises_when_no_default() -> None:
+    api = StubApiClient(_mixed_type_payload())
+    manager = FlagManager(api, StubCache(), RuleEngine(), 300)
+
+    with pytest.raises(EvaluationError):
+        manager.single("json-flag")
+
+
+def test_all_skips_unrecognized_flag_type_but_returns_the_rest() -> None:
+    api = StubApiClient(_mixed_type_payload())
+    manager = FlagManager(api, StubCache(), RuleEngine(), 300)
+
+    flags = manager.all()
+    assert sorted(f.key for f in flags) == ["bool-flag", "num-flag", "str-flag"]
+
+
+def test_single_unrecognized_flag_type_logs_once() -> None:
+    logger = RecordingLogger()
+    api = StubApiClient(_mixed_type_payload())
+    manager = FlagManager(api, StubCache(), RuleEngine(), 300, logger=logger)
+
+    manager.single("json-flag", "a")
+    manager.single("json-flag", "b")
+    manager.all()
+
+    assert len(logger.warnings) == 1
+    assert "json-flag" in logger.warnings[0]
+    assert "json" in logger.warnings[0]

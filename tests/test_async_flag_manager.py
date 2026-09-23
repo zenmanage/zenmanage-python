@@ -171,6 +171,111 @@ async def test_async_usage_context_for_anonymous_and_named_context() -> None:
     assert api.reported[-1][1] is context
 
 
+class RecordingLogger:
+    """Minimal logger stub that records warning() calls for assertions."""
+
+    def __init__(self) -> None:
+        self.warnings: list[tuple[object, ...]] = []
+
+    def debug(self, msg: object, *args: object, **kwargs: object) -> None:
+        pass
+
+    def info(self, msg: object, *args: object, **kwargs: object) -> None:
+        pass
+
+    def warning(self, msg: object, *args: object, **kwargs: object) -> None:
+        self.warnings.append((msg, *args))
+
+    def error(self, msg: object, *args: object, **kwargs: object) -> None:
+        pass
+
+
+def _json_flag(**overrides: object) -> dict:
+    """A flag using a type the API may start serving before this SDK knows about it."""
+    payload = {
+        "version": "fla_json",
+        "type": "json",
+        "key": "json-flag",
+        "name": "json-flag",
+        "target": {"value": {"value": {"json": {"nested": "value", "count": 3}}}},
+        "rules": [],
+    }
+    payload.update(overrides)
+    return payload
+
+
+def _mixed_type_payload() -> list[dict]:
+    return [
+        _base_flag(key="bool-flag", type="boolean", target={"value": {"value": {"boolean": True}}}),
+        _base_flag(key="str-flag", type="string", target={"value": {"value": {"string": "hello"}}}),
+        _base_flag(key="num-flag", type="number", target={"value": {"value": {"number": 42}}}),
+        _json_flag(),
+    ]
+
+
+@pytest.mark.asyncio
+async def test_async_single_unrecognized_flag_type_resolves_to_inline_default() -> None:
+    """A rules payload with a future/unknown flag type (e.g. "json") must not raise, and the
+    unknown flag must resolve to the caller's default rather than a garbage/mis-parsed value —
+    while every other flag in the same payload evaluates normally."""
+    api = StubAsyncApiClient(_mixed_type_payload())
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
+
+    assert (await manager.single("bool-flag", False)).is_enabled() is True
+    assert (await manager.single("str-flag", "fallback")).as_string() == "hello"
+    assert (await manager.single("num-flag", 0)).as_number() == 42.0
+
+    json_flag = await manager.single("json-flag", "my-default")
+    assert json_flag.as_string() == "my-default"
+    assert json_flag.get_value() == "my-default"
+
+    json_flag_bool_default = await manager.single("json-flag", True)
+    assert json_flag_bool_default.is_enabled() is True
+
+
+@pytest.mark.asyncio
+async def test_async_single_unrecognized_flag_type_resolves_to_defaults_collection() -> None:
+    api = StubAsyncApiClient(_mixed_type_payload())
+    defaults = DefaultsCollection.from_dict({"json-flag": "collection-default"})
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300).with_defaults(defaults)
+
+    flag = await manager.single("json-flag")
+    assert flag.as_string() == "collection-default"
+
+
+@pytest.mark.asyncio
+async def test_async_single_unrecognized_flag_type_raises_when_no_default() -> None:
+    api = StubAsyncApiClient(_mixed_type_payload())
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
+
+    with pytest.raises(EvaluationError):
+        await manager.single("json-flag")
+
+
+@pytest.mark.asyncio
+async def test_async_all_skips_unrecognized_flag_type_but_returns_the_rest() -> None:
+    api = StubAsyncApiClient(_mixed_type_payload())
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
+
+    flags = await manager.all()
+    assert sorted(f.key for f in flags) == ["bool-flag", "num-flag", "str-flag"]
+
+
+@pytest.mark.asyncio
+async def test_async_single_unrecognized_flag_type_logs_once() -> None:
+    logger = RecordingLogger()
+    api = StubAsyncApiClient(_mixed_type_payload())
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300, logger=logger)
+
+    await manager.single("json-flag", "a")
+    await manager.single("json-flag", "b")
+    await manager.all()
+
+    assert len(logger.warnings) == 1
+    assert "json-flag" in logger.warnings[0]
+    assert "json" in logger.warnings[0]
+
+
 @pytest.mark.asyncio
 async def test_async_rollout_outside_bucket_returns_fallback() -> None:
     flag_data = _base_flag(

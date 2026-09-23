@@ -7,6 +7,13 @@ from typing import Literal, Optional, Protocol, TypedDict, Union
 FlagType = Literal["boolean", "string", "number"]
 FlagValue = Union[bool, str, int, float]
 
+# The flag types this SDK release knows how to evaluate. A rules payload may
+# contain flags of a type added to the API after this SDK shipped (e.g. a
+# future "json" type) — anything outside this set is treated as unknown and
+# degraded to the caller's default rather than evaluated, since we have no
+# safe way to interpret its value wrapper.
+KNOWN_FLAG_TYPES = frozenset({"boolean", "string", "number"})
+
 
 class Logger(Protocol):
     """Minimal logger protocol compatible with stdlib logging.Logger."""
