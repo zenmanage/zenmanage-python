@@ -14,7 +14,7 @@ from .errors import EvaluationError
 from .flag import Flag
 from .rollout import is_in_bucket
 from .rule_engine import RuleEngine
-from .types import FlagType, FlagValue, TargetData, ValueWrapper
+from .types import KNOWN_FLAG_TYPES, FlagType, FlagValue, Logger, TargetData, ValueWrapper
 
 CACHE_KEY = "zenmanage_rules"
 
@@ -26,7 +26,7 @@ class FlagManager:
         cache: Cache,
         rule_engine: RuleEngine,
         cache_ttl: int,
-        logger: Optional[object] = None,
+        logger: Optional[Logger] = None,
     ) -> None:
         self._api_client = api_client
         self._cache = cache
@@ -37,10 +37,12 @@ class FlagManager:
         self._flags: Optional[list[Flag]] = None
         self._context = Context("anonymous")
         self._defaults = DefaultsCollection()
+        self._warned_unknown_types: set[str] = set()
 
     def all(self) -> list[Flag]:
         self._ensure_rules_loaded()
-        return [self._evaluate_flag(flag) for flag in (self._flags or [])]
+        known = self._known_type_flags(self._flags or [])
+        return [self._evaluate_flag(flag) for flag in known]
 
     def single(self, key: str, default_value: Optional[FlagValue] = None) -> Flag:
         self._ensure_rules_loaded()
@@ -48,6 +50,9 @@ class FlagManager:
 
         for flag in self._flags or []:
             if flag.key == key:
+                if flag.type not in KNOWN_FLAG_TYPES:
+                    self._warn_unknown_type_once(flag.key, flag.type)
+                    break
                 self.report_usage(key, self._usage_context(), effective_default)
                 return self._evaluate_flag(flag)
 
@@ -85,6 +90,27 @@ class FlagManager:
         if default_value is not None:
             return default_value
         return self._defaults.get(key) if self._defaults.has(key) else None
+
+    def _known_type_flags(self, flags: list[Flag]) -> list[Flag]:
+        known: list[Flag] = []
+        for flag in flags:
+            if flag.type not in KNOWN_FLAG_TYPES:
+                self._warn_unknown_type_once(flag.key, flag.type)
+                continue
+            known.append(flag)
+        return known
+
+    def _warn_unknown_type_once(self, key: str, flag_type: str) -> None:
+        if key in self._warned_unknown_types:
+            return
+        self._warned_unknown_types.add(key)
+        if self._logger is not None:
+            self._logger.warning(
+                "Flag %r has unrecognized type %r; this SDK release does not know how to "
+                "evaluate it and will fall back to the caller's default until it is upgraded.",
+                key,
+                flag_type,
+            )
 
     def _usage_context(self) -> Optional[Context]:
         if (
