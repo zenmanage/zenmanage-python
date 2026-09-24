@@ -114,6 +114,13 @@ async def test_async_rollout() -> None:
     assert flag.as_bool() is True
 
 
+def test_with_context_and_with_defaults_return_async_flag_manager_instances() -> None:
+    manager = AsyncFlagManager(StubAsyncApiClient([]), StubCache(), RuleEngine(), 300)
+
+    assert isinstance(manager.with_context(Context.single("user", "u1")), AsyncFlagManager)
+    assert isinstance(manager.with_defaults(DefaultsCollection()), AsyncFlagManager)
+
+
 @pytest.mark.asyncio
 async def test_async_refresh_rules_writes_cache() -> None:
     api = StubAsyncApiClient([_base_flag()])

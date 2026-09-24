@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import json
 from typing import Optional, TypeVar
 
 from .cache import Cache
@@ -11,7 +12,15 @@ from .defaults_collection import DefaultsCollection
 from .flag import Flag
 from .rollout import is_in_bucket
 from .rule_engine import RuleEngine
-from .types import KNOWN_FLAG_TYPES, FlagType, FlagValue, Logger, TargetData, ValueWrapper
+from .types import (
+    KNOWN_FLAG_TYPES,
+    FlagType,
+    FlagValue,
+    Logger,
+    RulesResponse,
+    TargetData,
+    ValueWrapper,
+)
 
 CACHE_KEY = "zenmanage_rules"
 
@@ -79,6 +88,22 @@ class BaseFlagManager:
                 key,
                 flag_type,
             )
+
+    def _load_cached_flags(self) -> Optional[list[Flag]]:
+        cached = self._cache.get(CACHE_KEY)
+        if cached is None:
+            return None
+        try:
+            data = json.loads(cached)
+            if isinstance(data, dict) and isinstance(data.get("flags"), list):
+                return [Flag.from_dict(item) for item in data["flags"]]
+        except (json.JSONDecodeError, KeyError, TypeError, ValueError):
+            pass
+        return None
+
+    def _set_flags_from_response(self, response: RulesResponse) -> None:
+        self._flags = [Flag.from_dict(flag_data) for flag_data in response["flags"]]
+        self._cache.set(CACHE_KEY, json.dumps(response), self._cache_ttl)
 
     def _usage_context(self) -> Optional[Context]:
         if (

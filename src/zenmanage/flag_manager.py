@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-import json
 from typing import Optional
 
 from .api_client import ApiClient
@@ -10,7 +9,7 @@ from .cache import Cache
 from .context import Context
 from .errors import EvaluationError
 from .flag import Flag
-from .flag_manager_base import CACHE_KEY, BaseFlagManager
+from .flag_manager_base import BaseFlagManager
 from .rule_engine import RuleEngine
 from .types import KNOWN_FLAG_TYPES, FlagValue, Logger
 
@@ -66,19 +65,13 @@ class FlagManager(BaseFlagManager):
         if self._flags is not None:
             return
 
-        cached = self._cache.get(CACHE_KEY)
-        if cached is not None:
-            try:
-                data = json.loads(cached)
-                if isinstance(data, dict) and isinstance(data.get("flags"), list):
-                    self._flags = [Flag.from_dict(item) for item in data["flags"]]
-                    return
-            except (json.JSONDecodeError, KeyError, TypeError, ValueError):
-                pass
+        cached_flags = self._load_cached_flags()
+        if cached_flags is not None:
+            self._flags = cached_flags
+            return
 
         self._load_rules_from_api()
 
     def _load_rules_from_api(self) -> None:
         response = self._api_client.get_rules()
-        self._flags = [Flag.from_dict(flag_data) for flag_data in response["flags"]]
-        self._cache.set(CACHE_KEY, json.dumps(response), self._cache_ttl)
+        self._set_flags_from_response(response)
