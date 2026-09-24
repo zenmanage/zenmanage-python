@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import asyncio
 from typing import Optional
 
 from .async_api_client import AsyncApiClient
@@ -25,6 +26,7 @@ class AsyncFlagManager(BaseFlagManager):
     ) -> None:
         super().__init__(cache, rule_engine, cache_ttl, logger)
         self._api_client = api_client
+        self._load_lock = asyncio.Lock()
 
     async def all(self) -> list[Flag]:
         await self._ensure_rules_loaded()
@@ -59,18 +61,23 @@ class AsyncFlagManager(BaseFlagManager):
         await self._api_client.report_usage(key, context, default_value)
 
     async def refresh_rules(self) -> None:
-        await self._load_rules_from_api()
+        async with self._load_lock:
+            await self._load_rules_from_api()
 
     async def _ensure_rules_loaded(self) -> None:
         if self._flags is not None:
             return
 
-        cached_flags = self._load_cached_flags()
-        if cached_flags is not None:
-            self._flags = cached_flags
-            return
+        async with self._load_lock:
+            if self._flags is not None:
+                return
 
-        await self._load_rules_from_api()
+            cached_flags = self._load_cached_flags()
+            if cached_flags is not None:
+                self._flags = cached_flags
+                return
+
+            await self._load_rules_from_api()
 
     async def _load_rules_from_api(self) -> None:
         response = await self._api_client.get_rules()

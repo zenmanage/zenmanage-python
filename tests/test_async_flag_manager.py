@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import json
 
 import pytest
@@ -119,6 +120,62 @@ def test_with_context_and_with_defaults_return_async_flag_manager_instances() ->
 
     assert isinstance(manager.with_context(Context.single("user", "u1")), AsyncFlagManager)
     assert isinstance(manager.with_defaults(DefaultsCollection()), AsyncFlagManager)
+
+
+@pytest.mark.asyncio
+async def test_concurrent_initial_loads_fetch_rules_only_once() -> None:
+    """Multiple coroutines calling single()/all() before the first load completes must
+    not each trigger their own fetch - only one _load_rules_from_api call should win."""
+
+    class SlowStubAsyncApiClient(StubAsyncApiClient):
+        def __init__(self, flags: list[dict]) -> None:
+            super().__init__(flags)
+            self.get_rules_calls = 0
+
+        async def get_rules(self) -> dict:
+            self.get_rules_calls += 1
+            await asyncio.sleep(0)
+            return await super().get_rules()
+
+    api = SlowStubAsyncApiClient([_base_flag(key="f1")])
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
+
+    first, all_flags, second = await asyncio.gather(
+        manager.single("f1"), manager.all(), manager.single("f1")
+    )
+
+    assert api.get_rules_calls == 1
+    assert first.key == "f1"
+    assert second.key == "f1"
+    assert [f.key for f in all_flags] == ["f1"]
+
+
+@pytest.mark.asyncio
+async def test_refresh_rules_does_not_overlap_with_concurrent_loads() -> None:
+    """refresh_rules() must serialize through the same lock as the initial load, so an
+    explicit refresh racing with a cold-start single()/all() never fetches in parallel."""
+
+    class ConcurrencyTrackingStubAsyncApiClient(StubAsyncApiClient):
+        def __init__(self, flags: list[dict]) -> None:
+            super().__init__(flags)
+            self.max_concurrent_calls = 0
+            self._active_calls = 0
+
+        async def get_rules(self) -> dict:
+            self._active_calls += 1
+            self.max_concurrent_calls = max(self.max_concurrent_calls, self._active_calls)
+            await asyncio.sleep(0)
+            try:
+                return await super().get_rules()
+            finally:
+                self._active_calls -= 1
+
+    api = ConcurrencyTrackingStubAsyncApiClient([_base_flag(key="f1")])
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
+
+    await asyncio.gather(manager.single("f1"), manager.refresh_rules(), manager.refresh_rules())
+
+    assert api.max_concurrent_calls == 1
 
 
 @pytest.mark.asyncio
