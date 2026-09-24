@@ -113,6 +113,13 @@ def test_single_missing_raises() -> None:
         manager.single("missing")
 
 
+def test_with_context_and_with_defaults_return_flag_manager_instances() -> None:
+    manager = FlagManager(StubApiClient([]), StubCache(), RuleEngine(), 300)
+
+    assert isinstance(manager.with_context(Context.single("user", "u1")), FlagManager)
+    assert isinstance(manager.with_defaults(DefaultsCollection()), FlagManager)
+
+
 def test_rollout_path_evaluates_rollout_target() -> None:
     flag_data = _base_flag(
         rollout={
