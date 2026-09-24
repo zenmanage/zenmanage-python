@@ -4,15 +4,15 @@ from __future__ import annotations
 
 from typing import Literal, Optional, Protocol, TypedDict, Union
 
-FlagType = Literal["boolean", "string", "number"]
-FlagValue = Union[bool, str, int, float]
+FlagType = Literal["boolean", "string", "number", "json"]
+FlagValue = Union[bool, str, int, float, dict, list]
 
 # The flag types this SDK release knows how to evaluate. A rules payload may
-# contain flags of a type added to the API after this SDK shipped (e.g. a
-# future "json" type) — anything outside this set is treated as unknown and
-# degraded to the caller's default rather than evaluated, since we have no
-# safe way to interpret its value wrapper.
-KNOWN_FLAG_TYPES = frozenset({"boolean", "string", "number"})
+# contain flags of a type added to the API after this SDK shipped — anything
+# outside this set is treated as unknown and degraded to the caller's default
+# rather than evaluated, since we have no safe way to interpret its value
+# wrapper.
+KNOWN_FLAG_TYPES = frozenset({"boolean", "string", "number", "json"})
 
 
 class Logger(Protocol):
@@ -64,6 +64,7 @@ class ValueWrapper(TypedDict, total=False):
     boolean: bool
     string: str
     number: float
+    json: Union[dict, list]
 
 
 class RuleValue(TypedDict, total=False):

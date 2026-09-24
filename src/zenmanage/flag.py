@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
+from typing import Optional, Union
 
 from .types import FlagData, FlagType, FlagValue, RolloutData, RuleData, TargetData
 
@@ -67,6 +67,14 @@ class Flag:
                 return 0.0
         return 0.0
 
+    def as_json(self) -> Union[dict, list]:
+        # Only recognizes its own wrapper — no lossy cross-type coercion, per the PHP SDK.
+        value = self.target["value"]["value"]
+        json_value = value.get("json")
+        if isinstance(json_value, (dict, list)):
+            return json_value
+        return {}
+
     def get_value(self) -> FlagValue:
         value = self.target["value"]["value"]
         if "boolean" in value:
@@ -75,6 +83,8 @@ class Flag:
             return value["string"]
         if "number" in value:
             return value["number"]
+        if "json" in value:
+            return value["json"]
         first = next(iter(value.values()), "")
         if isinstance(first, bool):
             return first

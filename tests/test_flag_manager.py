@@ -237,14 +237,14 @@ class RecordingLogger:
         pass
 
 
-def _json_flag(**overrides: object) -> dict:
+def _enum_flag(**overrides: object) -> dict:
     """A flag using a type the API may start serving before this SDK knows about it."""
     payload = {
-        "version": "fla_json",
-        "type": "json",
-        "key": "json-flag",
-        "name": "json-flag",
-        "target": {"value": {"value": {"json": {"nested": "value", "count": 3}}}},
+        "version": "fla_enum",
+        "type": "enum",
+        "key": "enum-flag",
+        "name": "enum-flag",
+        "target": {"value": {"value": {"enum": "north-america"}}},
         "rules": [],
     }
     payload.update(overrides)
@@ -256,12 +256,17 @@ def _mixed_type_payload() -> list[dict]:
         _base_flag(key="bool-flag", type="boolean", target={"value": {"value": {"boolean": True}}}),
         _base_flag(key="str-flag", type="string", target={"value": {"value": {"string": "hello"}}}),
         _base_flag(key="num-flag", type="number", target={"value": {"value": {"number": 42}}}),
-        _json_flag(),
+        _base_flag(
+            key="json-flag",
+            type="json",
+            target={"value": {"value": {"json": {"nested": "value", "count": 3}}}},
+        ),
+        _enum_flag(),
     ]
 
 
 def test_single_unrecognized_flag_type_resolves_to_inline_default() -> None:
-    """A rules payload with a future/unknown flag type (e.g. "json") must not raise, and the
+    """A rules payload with a future/unknown flag type (e.g. "enum") must not raise, and the
     unknown flag must resolve to the caller's default rather than a garbage/mis-parsed value —
     while every other flag in the same payload evaluates normally."""
     api = StubApiClient(_mixed_type_payload())
@@ -270,21 +275,22 @@ def test_single_unrecognized_flag_type_resolves_to_inline_default() -> None:
     assert manager.single("bool-flag", False).is_enabled() is True
     assert manager.single("str-flag", "fallback").as_string() == "hello"
     assert manager.single("num-flag", 0).as_number() == 42.0
+    assert manager.single("json-flag", {}).as_json() == {"nested": "value", "count": 3}
 
-    json_flag = manager.single("json-flag", "my-default")
-    assert json_flag.as_string() == "my-default"
-    assert json_flag.get_value() == "my-default"
+    enum_flag = manager.single("enum-flag", "my-default")
+    assert enum_flag.as_string() == "my-default"
+    assert enum_flag.get_value() == "my-default"
 
-    json_flag_bool_default = manager.single("json-flag", True)
-    assert json_flag_bool_default.is_enabled() is True
+    enum_flag_bool_default = manager.single("enum-flag", True)
+    assert enum_flag_bool_default.is_enabled() is True
 
 
 def test_single_unrecognized_flag_type_resolves_to_defaults_collection() -> None:
     api = StubApiClient(_mixed_type_payload())
-    defaults = DefaultsCollection.from_dict({"json-flag": "collection-default"})
+    defaults = DefaultsCollection.from_dict({"enum-flag": "collection-default"})
     manager = FlagManager(api, StubCache(), RuleEngine(), 300).with_defaults(defaults)
 
-    flag = manager.single("json-flag")
+    flag = manager.single("enum-flag")
     assert flag.as_string() == "collection-default"
 
 
@@ -293,7 +299,7 @@ def test_single_unrecognized_flag_type_raises_when_no_default() -> None:
     manager = FlagManager(api, StubCache(), RuleEngine(), 300)
 
     with pytest.raises(EvaluationError):
-        manager.single("json-flag")
+        manager.single("enum-flag")
 
 
 def test_all_skips_unrecognized_flag_type_but_returns_the_rest() -> None:
@@ -301,7 +307,7 @@ def test_all_skips_unrecognized_flag_type_but_returns_the_rest() -> None:
     manager = FlagManager(api, StubCache(), RuleEngine(), 300)
 
     flags = manager.all()
-    assert sorted(f.key for f in flags) == ["bool-flag", "num-flag", "str-flag"]
+    assert sorted(f.key for f in flags) == ["bool-flag", "json-flag", "num-flag", "str-flag"]
 
 
 def test_single_unrecognized_flag_type_logs_once() -> None:
@@ -309,10 +315,30 @@ def test_single_unrecognized_flag_type_logs_once() -> None:
     api = StubApiClient(_mixed_type_payload())
     manager = FlagManager(api, StubCache(), RuleEngine(), 300, logger=logger)
 
-    manager.single("json-flag", "a")
-    manager.single("json-flag", "b")
+    manager.single("enum-flag", "a")
+    manager.single("enum-flag", "b")
     manager.all()
 
     assert len(logger.warnings) == 1
-    assert "json-flag" in logger.warnings[0]
-    assert "json" in logger.warnings[0]
+    assert "enum-flag" in logger.warnings[0]
+    assert "enum" in logger.warnings[0]
+
+
+def test_single_json_flag_evaluates_normally() -> None:
+    api = StubApiClient(_mixed_type_payload())
+    manager = FlagManager(api, StubCache(), RuleEngine(), 300)
+
+    flag = manager.single("json-flag")
+    assert flag.as_json() == {"nested": "value", "count": 3}
+
+
+def test_default_value_type_inference_dict_and_list() -> None:
+    manager = FlagManager(StubApiClient([]), StubCache(), RuleEngine(), 300)
+
+    dict_flag = manager.single("d", {"a": 1})
+    assert dict_flag.type == "json"
+    assert dict_flag.as_json() == {"a": 1}
+
+    list_flag = manager.single("l", [1, 2, 3])
+    assert list_flag.type == "json"
+    assert list_flag.as_json() == [1, 2, 3]

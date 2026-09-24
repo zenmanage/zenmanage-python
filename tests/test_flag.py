@@ -30,6 +30,16 @@ NUMBER_FLAG = Flag(
 )
 
 
+JSON_FLAG = Flag(
+    version="1",
+    type="json",
+    key="limits",
+    name="Limits",
+    target={"value": {"value": {"json": {"max": 10, "tags": ["a", "b"]}}}},
+    rules=[],
+)
+
+
 def test_flag_accessors() -> None:
     assert BOOL_FLAG.is_enabled()
     assert BOOL_FLAG.as_bool() is True
@@ -40,12 +50,52 @@ def test_flag_accessors() -> None:
     assert NUMBER_FLAG.as_number() == 42.0
     assert NUMBER_FLAG.as_string() == "42"
 
+    assert JSON_FLAG.as_json() == {"max": 10, "tags": ["a", "b"]}
+    assert JSON_FLAG.get_value() == {"max": 10, "tags": ["a", "b"]}
+
+
+def test_as_json_returns_list_when_decoded_value_is_a_list() -> None:
+    list_flag = Flag(
+        version="1",
+        type="json",
+        key="ids",
+        name="ids",
+        target={"value": {"value": {"json": [1, 2, 3]}}},
+        rules=[],
+    )
+    assert list_flag.as_json() == [1, 2, 3]
+
+
+def test_as_json_safe_zero_value_for_non_json_flags() -> None:
+    assert BOOL_FLAG.as_json() == {}
+    assert STRING_FLAG.as_json() == {}
+    assert NUMBER_FLAG.as_json() == {}
+
+
+def test_as_json_safe_zero_value_for_bare_scalar_json() -> None:
+    scalar_flag = Flag(
+        version="1",
+        type="json",
+        key="odd",
+        name="odd",
+        target={"value": {"value": {"json": 5}}},
+        rules=[],
+    )
+    assert scalar_flag.as_json() == {}
+
 
 def test_flag_roundtrip() -> None:
     payload = STRING_FLAG.to_dict()
     hydrated = Flag.from_dict(payload)
     assert hydrated.key == STRING_FLAG.key
     assert hydrated.as_string() == "one-page"
+
+
+def test_json_flag_roundtrip() -> None:
+    payload = JSON_FLAG.to_dict()
+    hydrated = Flag.from_dict(payload)
+    assert hydrated.key == JSON_FLAG.key
+    assert hydrated.as_json() == {"max": 10, "tags": ["a", "b"]}
 
 
 def test_flag_bool_and_number_cross_casts() -> None:

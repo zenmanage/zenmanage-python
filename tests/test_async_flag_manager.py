@@ -254,14 +254,14 @@ class RecordingLogger:
         pass
 
 
-def _json_flag(**overrides: object) -> dict:
+def _enum_flag(**overrides: object) -> dict:
     """A flag using a type the API may start serving before this SDK knows about it."""
     payload = {
-        "version": "fla_json",
-        "type": "json",
-        "key": "json-flag",
-        "name": "json-flag",
-        "target": {"value": {"value": {"json": {"nested": "value", "count": 3}}}},
+        "version": "fla_enum",
+        "type": "enum",
+        "key": "enum-flag",
+        "name": "enum-flag",
+        "target": {"value": {"value": {"enum": "north-america"}}},
         "rules": [],
     }
     payload.update(overrides)
@@ -273,13 +273,18 @@ def _mixed_type_payload() -> list[dict]:
         _base_flag(key="bool-flag", type="boolean", target={"value": {"value": {"boolean": True}}}),
         _base_flag(key="str-flag", type="string", target={"value": {"value": {"string": "hello"}}}),
         _base_flag(key="num-flag", type="number", target={"value": {"value": {"number": 42}}}),
-        _json_flag(),
+        _base_flag(
+            key="json-flag",
+            type="json",
+            target={"value": {"value": {"json": {"nested": "value", "count": 3}}}},
+        ),
+        _enum_flag(),
     ]
 
 
 @pytest.mark.asyncio
 async def test_async_single_unrecognized_flag_type_resolves_to_inline_default() -> None:
-    """A rules payload with a future/unknown flag type (e.g. "json") must not raise, and the
+    """A rules payload with a future/unknown flag type (e.g. "enum") must not raise, and the
     unknown flag must resolve to the caller's default rather than a garbage/mis-parsed value —
     while every other flag in the same payload evaluates normally."""
     api = StubAsyncApiClient(_mixed_type_payload())
@@ -288,22 +293,23 @@ async def test_async_single_unrecognized_flag_type_resolves_to_inline_default() 
     assert (await manager.single("bool-flag", False)).is_enabled() is True
     assert (await manager.single("str-flag", "fallback")).as_string() == "hello"
     assert (await manager.single("num-flag", 0)).as_number() == 42.0
+    assert (await manager.single("json-flag", {})).as_json() == {"nested": "value", "count": 3}
 
-    json_flag = await manager.single("json-flag", "my-default")
-    assert json_flag.as_string() == "my-default"
-    assert json_flag.get_value() == "my-default"
+    enum_flag = await manager.single("enum-flag", "my-default")
+    assert enum_flag.as_string() == "my-default"
+    assert enum_flag.get_value() == "my-default"
 
-    json_flag_bool_default = await manager.single("json-flag", True)
-    assert json_flag_bool_default.is_enabled() is True
+    enum_flag_bool_default = await manager.single("enum-flag", True)
+    assert enum_flag_bool_default.is_enabled() is True
 
 
 @pytest.mark.asyncio
 async def test_async_single_unrecognized_flag_type_resolves_to_defaults_collection() -> None:
     api = StubAsyncApiClient(_mixed_type_payload())
-    defaults = DefaultsCollection.from_dict({"json-flag": "collection-default"})
+    defaults = DefaultsCollection.from_dict({"enum-flag": "collection-default"})
     manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300).with_defaults(defaults)
 
-    flag = await manager.single("json-flag")
+    flag = await manager.single("enum-flag")
     assert flag.as_string() == "collection-default"
 
 
@@ -313,7 +319,7 @@ async def test_async_single_unrecognized_flag_type_raises_when_no_default() -> N
     manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
 
     with pytest.raises(EvaluationError):
-        await manager.single("json-flag")
+        await manager.single("enum-flag")
 
 
 @pytest.mark.asyncio
@@ -322,7 +328,7 @@ async def test_async_all_skips_unrecognized_flag_type_but_returns_the_rest() -> 
     manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
 
     flags = await manager.all()
-    assert sorted(f.key for f in flags) == ["bool-flag", "num-flag", "str-flag"]
+    assert sorted(f.key for f in flags) == ["bool-flag", "json-flag", "num-flag", "str-flag"]
 
 
 @pytest.mark.asyncio
@@ -331,13 +337,35 @@ async def test_async_single_unrecognized_flag_type_logs_once() -> None:
     api = StubAsyncApiClient(_mixed_type_payload())
     manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300, logger=logger)
 
-    await manager.single("json-flag", "a")
-    await manager.single("json-flag", "b")
+    await manager.single("enum-flag", "a")
+    await manager.single("enum-flag", "b")
     await manager.all()
 
     assert len(logger.warnings) == 1
-    assert "json-flag" in logger.warnings[0]
-    assert "json" in logger.warnings[0]
+    assert "enum-flag" in logger.warnings[0]
+    assert "enum" in logger.warnings[0]
+
+
+@pytest.mark.asyncio
+async def test_async_single_json_flag_evaluates_normally() -> None:
+    api = StubAsyncApiClient(_mixed_type_payload())
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
+
+    flag = await manager.single("json-flag")
+    assert flag.as_json() == {"nested": "value", "count": 3}
+
+
+@pytest.mark.asyncio
+async def test_async_default_value_type_inference_dict_and_list() -> None:
+    manager = AsyncFlagManager(StubAsyncApiClient([]), StubCache(), RuleEngine(), 300)
+
+    dict_flag = await manager.single("d", {"a": 1})
+    assert dict_flag.type == "json"
+    assert dict_flag.as_json() == {"a": 1}
+
+    list_flag = await manager.single("l", [1, 2, 3])
+    assert list_flag.type == "json"
+    assert list_flag.as_json() == [1, 2, 3]
 
 
 @pytest.mark.asyncio

@@ -117,6 +117,15 @@ else:
     render_multi_page_checkout()
 ```
 
+### JSON Configuration
+
+```python
+# Structured configuration values (both JSON objects and arrays decode to Python dict/list)
+theme = zenmanage.flags().single("theme-config", {"mode": "light", "accent": "#4f46e5"}).as_json()
+
+rollout_plan = zenmanage.flags().single("rollout-plan", []).as_json()
+```
+
 ### Percentage Rollouts
 
 ```python
