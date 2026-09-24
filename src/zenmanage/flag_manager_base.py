@@ -159,6 +159,9 @@ class BaseFlagManager:
         elif isinstance(default_value, (int, float)):
             flag_type = "number"
             value_payload = {"number": float(default_value)}
+        elif isinstance(default_value, (dict, list)):
+            flag_type = "json"
+            value_payload = {"json": default_value}
         else:
             flag_type = "string"
             value_payload = {"string": str(default_value)}
