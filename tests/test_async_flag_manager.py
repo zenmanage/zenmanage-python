@@ -151,6 +151,34 @@ async def test_concurrent_initial_loads_fetch_rules_only_once() -> None:
 
 
 @pytest.mark.asyncio
+async def test_refresh_rules_does_not_overlap_with_concurrent_loads() -> None:
+    """refresh_rules() must serialize through the same lock as the initial load, so an
+    explicit refresh racing with a cold-start single()/all() never fetches in parallel."""
+
+    class ConcurrencyTrackingStubAsyncApiClient(StubAsyncApiClient):
+        def __init__(self, flags: list[dict]) -> None:
+            super().__init__(flags)
+            self.max_concurrent_calls = 0
+            self._active_calls = 0
+
+        async def get_rules(self) -> dict:
+            self._active_calls += 1
+            self.max_concurrent_calls = max(self.max_concurrent_calls, self._active_calls)
+            await asyncio.sleep(0)
+            try:
+                return await super().get_rules()
+            finally:
+                self._active_calls -= 1
+
+    api = ConcurrencyTrackingStubAsyncApiClient([_base_flag(key="f1")])
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
+
+    await asyncio.gather(manager.single("f1"), manager.refresh_rules(), manager.refresh_rules())
+
+    assert api.max_concurrent_calls == 1
+
+
+@pytest.mark.asyncio
 async def test_async_refresh_rules_writes_cache() -> None:
     api = StubAsyncApiClient([_base_flag()])
     cache = StubCache()

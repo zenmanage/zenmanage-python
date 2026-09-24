@@ -61,7 +61,8 @@ class AsyncFlagManager(BaseFlagManager):
         await self._api_client.report_usage(key, context, default_value)
 
     async def refresh_rules(self) -> None:
-        await self._load_rules_from_api()
+        async with self._load_lock:
+            await self._load_rules_from_api()
 
     async def _ensure_rules_loaded(self) -> None:
         if self._flags is not None:
