@@ -173,6 +173,33 @@ def test_refresh_rules_fetches_again() -> None:
     assert cache.saved is not None
 
 
+def test_clone_does_not_see_parent_refresh() -> None:
+    api = StubApiClient([_base_flag(type="string", target={"value": {"value": {"string": "old"}}})])
+    manager = FlagManager(api, StubCache(), RuleEngine(), 300)
+    clone = manager.with_context(Context.single("user", "u1"))
+
+    # Force the clone's own snapshot to load before the parent refreshes.
+    clone.single("new-ui")
+
+    api.flags = [_base_flag(type="string", target={"value": {"value": {"string": "new"}}})]
+    manager.refresh_rules()
+
+    assert clone.single("new-ui").as_string() == "old"
+
+
+def test_parent_does_not_see_clone_refresh() -> None:
+    api = StubApiClient([_base_flag(type="string", target={"value": {"value": {"string": "old"}}})])
+    manager = FlagManager(api, StubCache(), RuleEngine(), 300)
+    clone = manager.with_context(Context.single("user", "u1"))
+
+    manager.single("new-ui")
+
+    api.flags = [_base_flag(type="string", target={"value": {"value": {"string": "new"}}})]
+    clone.refresh_rules()
+
+    assert manager.single("new-ui").as_string() == "old"
+
+
 def test_all_returns_evaluated_flags() -> None:
     api = StubApiClient([_base_flag(key="f1"), _base_flag(key="f2")])
     manager = FlagManager(api, StubCache(), RuleEngine(), 300)

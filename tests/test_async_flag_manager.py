@@ -188,6 +188,38 @@ async def test_async_refresh_rules_writes_cache() -> None:
 
 
 @pytest.mark.asyncio
+async def test_clone_does_not_see_parent_refresh() -> None:
+    api = StubAsyncApiClient(
+        [_base_flag(type="string", target={"value": {"value": {"string": "old"}}})]
+    )
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
+    clone = manager.with_context(Context.single("user", "u1"))
+
+    await clone.single("new-ui")
+
+    api.flags = [_base_flag(type="string", target={"value": {"value": {"string": "new"}}})]
+    await manager.refresh_rules()
+
+    assert (await clone.single("new-ui")).as_string() == "old"
+
+
+@pytest.mark.asyncio
+async def test_parent_does_not_see_clone_refresh() -> None:
+    api = StubAsyncApiClient(
+        [_base_flag(type="string", target={"value": {"value": {"string": "old"}}})]
+    )
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
+    clone = manager.with_context(Context.single("user", "u1"))
+
+    await manager.single("new-ui")
+
+    api.flags = [_base_flag(type="string", target={"value": {"value": {"string": "new"}}})]
+    await clone.refresh_rules()
+
+    assert (await manager.single("new-ui")).as_string() == "old"
+
+
+@pytest.mark.asyncio
 async def test_async_all_returns_all_flags() -> None:
     api = StubAsyncApiClient([_base_flag(key="f1"), _base_flag(key="f2")])
     manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
