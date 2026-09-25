@@ -41,6 +41,8 @@ class Flag:
             return str(value["boolean"])
         if "number" in value:
             return str(value["number"])
+        if "json" in value:
+            return ""
         first = next(iter(value.values()), "")
         return str(first)
 

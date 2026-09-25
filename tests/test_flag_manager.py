@@ -6,7 +6,7 @@ from typing import Optional
 import pytest
 
 from zenmanage import Attribute, Context, DefaultsCollection
-from zenmanage.errors import EvaluationError
+from zenmanage.errors import EvaluationError, FetchRulesError, InvalidRulesError
 from zenmanage.flag_manager import FlagManager
 from zenmanage.rule_engine import RuleEngine
 
@@ -369,3 +369,62 @@ def test_default_value_type_inference_dict_and_list() -> None:
     list_flag = manager.single("l", [1, 2, 3])
     assert list_flag.type == "json"
     assert list_flag.as_json() == [1, 2, 3]
+
+
+class FailingApiClient:
+    """Stub API client simulating an invalid/unreachable environment key: every
+    rules fetch raises, as the real ApiClient does after exhausting retries."""
+
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+        self.reported: list[tuple[str, object, object]] = []
+
+    def get_rules(self) -> dict:
+        raise self.error
+
+    def report_usage(self, key: str, context: object = None, default_value: object = None) -> None:
+        self.reported.append((key, context, default_value))
+
+
+def test_single_falls_back_to_inline_default_when_rules_fetch_fails() -> None:
+    api = FailingApiClient(FetchRulesError("unreachable environment", status_code=401))
+    manager = FlagManager(api, StubCache(), RuleEngine(), 300)
+
+    flag = manager.single("new-ui", True)
+    assert flag.as_bool() is True
+
+
+def test_single_falls_back_to_defaults_collection_when_rules_fetch_fails() -> None:
+    api = FailingApiClient(FetchRulesError("unreachable environment", status_code=401))
+    defaults = DefaultsCollection.from_dict({"welcome": "hello"})
+    manager = FlagManager(api, StubCache(), RuleEngine(), 300).with_defaults(defaults)
+
+    flag = manager.single("welcome")
+    assert flag.as_string() == "hello"
+
+
+def test_single_raises_when_rules_fetch_fails_and_no_default() -> None:
+    api = FailingApiClient(FetchRulesError("unreachable environment", status_code=401))
+    manager = FlagManager(api, StubCache(), RuleEngine(), 300)
+
+    with pytest.raises(EvaluationError):
+        manager.single("missing")
+
+
+def test_single_falls_back_to_default_when_rules_response_is_invalid() -> None:
+    api = FailingApiClient(InvalidRulesError("API response is not valid JSON"))
+    manager = FlagManager(api, StubCache(), RuleEngine(), 300)
+
+    flag = manager.single("new-ui", False)
+    assert flag.as_bool() is False
+
+
+def test_single_logs_warning_when_rules_fetch_fails() -> None:
+    logger = RecordingLogger()
+    api = FailingApiClient(FetchRulesError("unreachable environment", status_code=401))
+    manager = FlagManager(api, StubCache(), RuleEngine(), 300, logger=logger)
+
+    manager.single("new-ui", True)
+
+    assert len(logger.warnings) == 1
+    assert "unreachable environment" in logger.warnings[0][0] % logger.warnings[0][1:]

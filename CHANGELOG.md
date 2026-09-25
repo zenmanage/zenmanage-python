@@ -2,6 +2,11 @@
 
 All notable changes to this project are documented in this file.
 
+## Unreleased
+
+- Fixed `Flag.as_string()` to return `""` for a `json`-typed flag instead of stringifying the decoded dict/list, matching the safe-zero-value behavior already used by `as_bool()`/`as_number()` and the documented cross-SDK coercion contract. (ZEN-1750)
+- Fixed `single()` (sync and async) to fall back to the caller-provided default (inline value or `DefaultsCollection` entry) when the rules fetch fails outright, e.g. an invalid or unreachable environment key — previously the fetch error propagated to the caller instead of falling back, unlike the reference PHP SDK. (ZEN-1751)
+
 ## 1.2.0 - 2026-09-24
 
 - Added the `json` flag type: `Flag.as_json()` returns the decoded value (a `dict` or `list`) for a `json`-typed flag. Like `as_bool()`/`as_string()`/`as_number()`, calling it on a flag of a different type returns a safe zero value (`{}`) rather than attempting a lossy conversion. `dict`/`list` default values passed to `single()` or `DefaultsCollection` are now typed as `json` instead of being stringified.

@@ -8,7 +8,7 @@ from typing import Optional
 from .async_api_client import AsyncApiClient
 from .cache import Cache
 from .context import Context
-from .errors import EvaluationError
+from .errors import EvaluationError, FetchRulesError, InvalidRulesError
 from .flag import Flag
 from .flag_manager_base import BaseFlagManager
 from .rule_engine import RuleEngine
@@ -34,10 +34,10 @@ class AsyncFlagManager(BaseFlagManager):
         return [self._evaluate_flag(flag) for flag in known]
 
     async def single(self, key: str, default_value: Optional[FlagValue] = None) -> Flag:
-        await self._ensure_rules_loaded()
         effective_default = self._resolve_effective_default(key, default_value)
+        flags = await self._load_flags_or_fall_back_to_defaults()
 
-        for flag in self._flags or []:
+        for flag in flags:
             if flag.key == key:
                 if flag.type not in KNOWN_FLAG_TYPES:
                     self._warn_unknown_type_once(flag.key, flag.type)
@@ -88,3 +88,20 @@ class AsyncFlagManager(BaseFlagManager):
     async def _load_rules_from_api(self) -> None:
         response = await self._api_client.get_rules()
         self._set_flags_from_response(response)
+
+    async def _load_flags_or_fall_back_to_defaults(self) -> list[Flag]:
+        """Load the current flag set, falling back to an empty list (so callers
+        fall through to their own default handling) if rule-loading fails
+        outright, e.g. an invalid or unreachable environment key.
+        """
+        try:
+            await self._ensure_rules_loaded()
+        except (FetchRulesError, InvalidRulesError) as error:
+            if self._logger is not None:
+                self._logger.warning(
+                    "Failed to load rules, falling back to configured defaults: %s",
+                    error,
+                )
+            return []
+
+        return self._flags or []

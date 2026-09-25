@@ -8,7 +8,7 @@ import pytest
 from zenmanage.async_flag_manager import AsyncFlagManager
 from zenmanage.context import Context
 from zenmanage.defaults_collection import DefaultsCollection
-from zenmanage.errors import EvaluationError
+from zenmanage.errors import EvaluationError, FetchRulesError, InvalidRulesError
 from zenmanage.rule_engine import RuleEngine
 
 
@@ -417,3 +417,69 @@ async def test_async_rollout_outside_bucket_returns_fallback() -> None:
     manager = AsyncFlagManager(StubAsyncApiClient([flag_data]), StubCache(), RuleEngine(), 300)
     flag = await manager.with_context(Context.single("user", "u1")).single("new-ui")
     assert flag.as_string() == "fallback"
+
+
+class FailingAsyncApiClient:
+    """Stub async API client simulating an invalid/unreachable environment key: every
+    rules fetch raises, as the real AsyncApiClient does after exhausting retries."""
+
+    def __init__(self, error: Exception) -> None:
+        self.error = error
+        self.reported: list[tuple[str, object, object]] = []
+
+    async def get_rules(self) -> dict:
+        raise self.error
+
+    async def report_usage(
+        self, key: str, context: object = None, default_value: object = None
+    ) -> None:
+        self.reported.append((key, context, default_value))
+
+
+@pytest.mark.asyncio
+async def test_async_single_falls_back_to_inline_default_when_rules_fetch_fails() -> None:
+    api = FailingAsyncApiClient(FetchRulesError("unreachable environment", status_code=401))
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
+
+    flag = await manager.single("new-ui", True)
+    assert flag.as_bool() is True
+
+
+@pytest.mark.asyncio
+async def test_async_single_falls_back_to_defaults_collection_when_rules_fetch_fails() -> None:
+    api = FailingAsyncApiClient(FetchRulesError("unreachable environment", status_code=401))
+    defaults = DefaultsCollection.from_dict({"welcome": "hello"})
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300).with_defaults(defaults)
+
+    flag = await manager.single("welcome")
+    assert flag.as_string() == "hello"
+
+
+@pytest.mark.asyncio
+async def test_async_single_raises_when_rules_fetch_fails_and_no_default() -> None:
+    api = FailingAsyncApiClient(FetchRulesError("unreachable environment", status_code=401))
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
+
+    with pytest.raises(EvaluationError):
+        await manager.single("missing")
+
+
+@pytest.mark.asyncio
+async def test_async_single_falls_back_to_default_when_rules_response_is_invalid() -> None:
+    api = FailingAsyncApiClient(InvalidRulesError("API response is not valid JSON"))
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
+
+    flag = await manager.single("new-ui", False)
+    assert flag.as_bool() is False
+
+
+@pytest.mark.asyncio
+async def test_async_single_logs_warning_when_rules_fetch_fails() -> None:
+    logger = RecordingLogger()
+    api = FailingAsyncApiClient(FetchRulesError("unreachable environment", status_code=401))
+    manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300, logger=logger)
+
+    await manager.single("new-ui", True)
+
+    assert len(logger.warnings) == 1
+    assert "unreachable environment" in logger.warnings[0][0] % logger.warnings[0][1:]

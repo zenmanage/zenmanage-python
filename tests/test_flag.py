@@ -163,6 +163,25 @@ def test_as_string_from_boolean_and_number() -> None:
     assert NUMBER_FLAG.as_string() == "42"
 
 
+def test_as_string_safe_zero_value_for_json_flag() -> None:
+    # Per the cross-SDK coercion contract (zenmanage-php README), calling the
+    # "wrong" accessor on a json-typed flag returns that type's safe zero
+    # value instead of stringifying the decoded dict/list.
+    assert JSON_FLAG.as_string() == ""
+
+
+def test_as_string_safe_zero_value_for_json_list_flag() -> None:
+    list_flag = Flag(
+        version="1",
+        type="json",
+        key="ids",
+        name="ids",
+        target={"value": {"value": {"json": [1, 2, 3]}}},
+        rules=[],
+    )
+    assert list_flag.as_string() == ""
+
+
 def test_as_number_from_first_fallback_variants() -> None:
     bool_first = Flag(
         version="1",
