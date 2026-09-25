@@ -407,8 +407,13 @@ def test_single_raises_when_rules_fetch_fails_and_no_default() -> None:
     api = FailingApiClient(FetchRulesError("unreachable environment", status_code=401))
     manager = FlagManager(api, StubCache(), RuleEngine(), 300)
 
-    with pytest.raises(EvaluationError):
+    with pytest.raises(EvaluationError) as exc_info:
         manager.single("missing")
+
+    # The original fetch error must stay attached as the cause, so a caller
+    # inspecting the traceback can tell "rules failed to load" apart from an
+    # actually-missing flag key.
+    assert isinstance(exc_info.value.__cause__, FetchRulesError)
 
 
 def test_single_falls_back_to_default_when_rules_response_is_invalid() -> None:

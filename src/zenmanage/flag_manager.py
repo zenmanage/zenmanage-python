@@ -25,6 +25,7 @@ class FlagManager(BaseFlagManager):
     ) -> None:
         super().__init__(cache, rule_engine, cache_ttl, logger)
         self._api_client = api_client
+        self._last_load_error: Optional[Exception] = None
 
     def all(self) -> list[Flag]:
         self._ensure_rules_loaded()
@@ -47,6 +48,11 @@ class FlagManager(BaseFlagManager):
             result = self._create_flag_from_default(key, effective_default)
             self.report_usage(key, self._usage_context(), effective_default)
             return result
+
+        if self._last_load_error is not None:
+            raise EvaluationError(
+                f"Flag not found: {key} (rules failed to load: {self._last_load_error})"
+            ) from self._last_load_error
 
         raise EvaluationError(f"Flag not found: {key}")
 
@@ -86,6 +92,7 @@ class FlagManager(BaseFlagManager):
         try:
             self._ensure_rules_loaded()
         except (FetchRulesError, InvalidRulesError) as error:
+            self._last_load_error = error
             if self._logger is not None:
                 self._logger.warning(
                     "Failed to load rules, falling back to configured defaults: %s",
@@ -93,6 +100,7 @@ class FlagManager(BaseFlagManager):
                 )
             return []
 
+        self._last_load_error = None
         return self._flags or []
 
     def _load_rules_from_api(self) -> None:

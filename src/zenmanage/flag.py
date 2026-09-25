@@ -27,10 +27,12 @@ class Flag:
         value = self.target["value"]["value"]
         if "boolean" in value:
             return bool(value["boolean"])
-        if "number" in value:
-            return bool(value["number"])
-        if "string" in value:
-            return bool(value["string"])
+        # Per the cross-SDK coercion contract, every non-boolean type returns True
+        # unconditionally -- the value is wrapped in a non-empty structure, and
+        # that wrapper is truthy, regardless of the underlying value (including a
+        # number flag set to 0, a string flag set to "", or an empty json {}/[]).
+        if "number" in value or "string" in value or "json" in value:
+            return True
         return bool(next(iter(value.values()), False))
 
     def as_string(self) -> str:

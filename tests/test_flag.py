@@ -99,6 +99,9 @@ def test_json_flag_roundtrip() -> None:
 
 
 def test_flag_bool_and_number_cross_casts() -> None:
+    # Per the cross-SDK coercion contract, as_bool() returns True unconditionally
+    # for every non-boolean type, regardless of the underlying value -- including
+    # a number flag set to 0 or a string flag set to "".
     numeric = Flag(
         version="1",
         type="number",
@@ -107,7 +110,7 @@ def test_flag_bool_and_number_cross_casts() -> None:
         target={"value": {"value": {"number": 0}}},
         rules=[],
     )
-    assert numeric.as_bool() is False
+    assert numeric.as_bool() is True
 
     as_bool_string = Flag(
         version="1",
@@ -117,7 +120,7 @@ def test_flag_bool_and_number_cross_casts() -> None:
         target={"value": {"value": {"string": ""}}},
         rules=[],
     )
-    assert as_bool_string.as_bool() is False
+    assert as_bool_string.as_bool() is True
 
 
 def test_flag_number_fallback_branches() -> None:
@@ -180,6 +183,31 @@ def test_as_string_safe_zero_value_for_json_list_flag() -> None:
         rules=[],
     )
     assert list_flag.as_string() == ""
+
+
+def test_as_bool_true_for_empty_json_flag() -> None:
+    # as_bool() must not fall through to the raw truthiness of the decoded
+    # value -- an empty {}/[] is falsy in Python but must still return True,
+    # per the cross-SDK coercion contract.
+    empty_object = Flag(
+        version="1",
+        type="json",
+        key="obj",
+        name="obj",
+        target={"value": {"value": {"json": {}}}},
+        rules=[],
+    )
+    assert empty_object.as_bool() is True
+
+    empty_list = Flag(
+        version="1",
+        type="json",
+        key="list",
+        name="list",
+        target={"value": {"value": {"json": []}}},
+        rules=[],
+    )
+    assert empty_list.as_bool() is True
 
 
 def test_as_number_from_first_fallback_variants() -> None:

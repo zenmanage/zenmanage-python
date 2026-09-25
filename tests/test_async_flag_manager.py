@@ -460,8 +460,10 @@ async def test_async_single_raises_when_rules_fetch_fails_and_no_default() -> No
     api = FailingAsyncApiClient(FetchRulesError("unreachable environment", status_code=401))
     manager = AsyncFlagManager(api, StubCache(), RuleEngine(), 300)
 
-    with pytest.raises(EvaluationError):
+    with pytest.raises(EvaluationError) as exc_info:
         await manager.single("missing")
+
+    assert isinstance(exc_info.value.__cause__, FetchRulesError)
 
 
 @pytest.mark.asyncio
