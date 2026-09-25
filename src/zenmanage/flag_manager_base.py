@@ -52,11 +52,26 @@ class BaseFlagManager:
         self._warned_unknown_types: set[str] = set()
 
     def with_context(self: T, context: Context) -> T:
+        """Return a clone of this manager scoped to ``context``.
+
+        The clone snapshots the parent's currently-loaded flags at the moment
+        it's created. Calling ``refresh_rules()`` on either the clone or the
+        parent afterwards only updates that instance — the two do not share
+        state, so the other keeps evaluating against the flags it already
+        had. This is intentional: it keeps a scoped manager's results stable
+        for its lifetime instead of shifting underfoot from an unrelated
+        refresh elsewhere.
+        """
         clone = copy.copy(self)
         clone._context = context
         return clone
 
     def with_defaults(self: T, defaults: DefaultsCollection) -> T:
+        """Return a clone of this manager scoped to ``defaults``.
+
+        See ``with_context()`` for the clone/refresh isolation semantics —
+        they apply identically here.
+        """
         clone = copy.copy(self)
         clone._defaults = defaults
         return clone

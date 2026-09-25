@@ -61,6 +61,12 @@ class AsyncFlagManager(BaseFlagManager):
         await self._api_client.report_usage(key, context, default_value)
 
     async def refresh_rules(self) -> None:
+        """Reload flags from the API into this instance only.
+
+        A manager obtained via ``with_context()``/``with_defaults()`` does
+        not share flag storage with the instance it was cloned from, so
+        refreshing one never affects the other.
+        """
         async with self._load_lock:
             await self._load_rules_from_api()
 
