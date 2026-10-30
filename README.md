@@ -1,6 +1,6 @@
 # Zenmanage Python SDK
 
-[![CI](https://github.com/zenmanage/zenmanage-python/actions/workflows/ci.yml/badge.svg)](https://github.com/zenmanage/zenmanage-python/actions/workflows/ci.yml) [![Version](https://img.shields.io/pypi/v/zenmanage)](https://pypi.org/project/zenmanage/) [![License](https://img.shields.io/github/license/zenmanage/zenmanage-python)](LICENSE) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/66861c5e33c04e208f9a779efedfce14)](https://app.codacy.com/gh/zenmanage/zenmanage-python/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade) [![Coverage](https://img.shields.io/badge/coverage-90%25%2B-brightgreen)](#development)
+[![CI](https://github.com/zenmanage/zenmanage-python/actions/workflows/ci.yml/badge.svg)](https://github.com/zenmanage/zenmanage-python/actions/workflows/ci.yml) [![Version](https://img.shields.io/pypi/v/zenmanage)](https://pypi.org/project/zenmanage/) [![License](https://img.shields.io/github/license/zenmanage/zenmanage-python)](LICENSE) [![Codacy Badge](https://app.codacy.com/project/badge/Grade/66861c5e33c04e208f9a779efedfce14)](https://app.codacy.com/gh/zenmanage/zenmanage-python/dashboard?utm_source=gh&utm_medium=referral&utm_content=&utm_campaign=Badge_grade) [![Coverage](https://img.shields.io/badge/coverage-90%25%2B-brightgreen)](https://github.com/zenmanage/zenmanage-python/actions/workflows/ci.yml)
 
 Add feature flags to your Python application in minutes. Control feature rollouts, A/B test, and manage configurations without deploying code.
 
